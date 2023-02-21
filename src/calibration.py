@@ -3,6 +3,7 @@ import shared
 import copy
 import numpy as np
 import tkinter as tk
+import json
 
 back_button = [0,40,0,100]
 save_button = [0,40,120,220]
@@ -11,7 +12,7 @@ result_square = [[0,0], [0, 480], [640, 480], [640, 0]]
 calibr_square = None
 point_clicked = 0
 camera_coordinates = [0, 0, 0]
-videoStream = None
+video_stream = None
 
 def widget_callback(x_entry, y_entry, z_entry, win):
     global camera_coordinates
@@ -36,6 +37,11 @@ def calibration_mouse_callback(event, x, y, flags, params):
             shared.APPLICATION_STATE = shared.MENU_STATE
             result_square = calibr_square
             point_clicked = 0
+            with open("calib.json", "w") as file:
+                data = {}
+                data["camera_coords"] = camera_coordinates
+                data["square_points"] = result_square
+                file.write(json.dumps(data))
         elif y > camera_button[0] and y < camera_button[1] and x > camera_button[2] and x < camera_button[3]:
             win = tk.Tk()
             win.title("Camera calibration")
@@ -62,16 +68,16 @@ def calibration_mouse_callback(event, x, y, flags, params):
 
 def build_calibration():
     # open video stream
-    global videoStream
+    global video_stream
     global calibr_square
     calibr_square =  copy.deepcopy(result_square)
     cv2.namedWindow(shared.CALIBRATION_WINDOW_NAME)
     cv2.setMouseCallback(shared.CALIBRATION_WINDOW_NAME, calibration_mouse_callback)
-    videoStream = cv2.VideoCapture(0)
+    video_stream = cv2.VideoCapture(0)
 
 def show_calibration():
     global calibr_square
-    success, image = videoStream.read()
+    success, image = video_stream.read()
     image[back_button[0]:back_button[1], back_button[2]:back_button[3]] = 180
     cv2.putText(image, 'back', (10, 30), cv2.FONT_HERSHEY_PLAIN, 2, (0), 3)
     image[save_button[0]:save_button[1], save_button[2]:save_button[3]] = 180
