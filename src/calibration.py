@@ -9,10 +9,12 @@ back_button = [0,40,0,100]
 save_button = [0,40,120,220]
 camera_button = [0,40,240,380]
 result_square = [[0,0], [0, 480], [640, 480], [640, 0]]
+transform_matrix = [1, 0, 0, 1]
 calibr_square = None
 point_clicked = 0
 camera_coordinates = [0, 0, 0]
 video_stream = None
+is_calibr = False
 
 def widget_callback(x_entry, y_entry, z_entry, win):
     global camera_coordinates
@@ -27,20 +29,37 @@ def calibration_mouse_callback(event, x, y, flags, params):
     global point_clicked
     global result_square
     global calibr_square
+    global transform_matrix
+    global is_calibr
     if event == cv2.EVENT_LBUTTONDOWN:
         if y > back_button[0] and y < back_button[1] and x > back_button[2] and x < back_button[3]:
             shared.APPLICATION_STATE = shared.MENU_STATE
             calibr_square = result_square
             point_clicked = 0
-            print(camera_coordinates)
         elif y > save_button[0] and y < save_button[1] and x > save_button[2] and x < save_button[3]:
             shared.APPLICATION_STATE = shared.MENU_STATE
             result_square = calibr_square
             point_clicked = 0
+            # Get transformation matrix here
+            width = 640
+            height = 480
+            A = np.matrix([[result_square[0][0] / width, result_square[0][1] / height, 0, 0],\
+                          [0, 0, result_square[0][0] / width, result_square[0][1] / height],\
+                          [result_square[1][0] / width, result_square[1][1] / height, 0, 0],\
+                          [0, 0, result_square[1][0] / width, result_square[1][1] / height],\
+                          [result_square[2][0] / width, result_square[2][1] / height, 0, 0],\
+                          [0, 0, result_square[2][0] / width, result_square[2][1] / height],\
+                          [result_square[3][0] / width, result_square[3][1] / height, 0, 0],\
+                          [0, 0, result_square[3][0] / width, result_square[3][1] / height]])
+            b = np.array([0, 0, 0, 1, 1, 1, 1, 0])
+            transform_matrix  = np.linalg.lstsq(A, b, rcond=None)[0]
+            is_calibr = True
+
             with open("calib.json", "w") as file:
                 data = {}
                 data["camera_coords"] = camera_coordinates
                 data["square_points"] = result_square
+                #data["transform_matrix "] = transform_matrix 
                 file.write(json.dumps(data))
         elif y > camera_button[0] and y < camera_button[1] and x > camera_button[2] and x < camera_button[3]:
             win = tk.Tk()
@@ -62,9 +81,16 @@ def calibration_mouse_callback(event, x, y, flags, params):
             
 
         else:
-            calibr_square[point_clicked % 4][0] = x
-            calibr_square[point_clicked % 4][1] = y
-            point_clicked += 1
+            print("OLD")
+            print(str(x / 640) + " " + str(y / 480))
+            print("NEW")
+            x1 = (x / 640) * transform_matrix[0] + (y / 480) * transform_matrix[1]
+            y1 = (x / 640) * transform_matrix[2] + (y / 480) * transform_matrix[3]
+            print(str(x1) + " " + str(y1))
+            if is_calibr is False:
+                calibr_square[point_clicked % 4][0] = x
+                calibr_square[point_clicked % 4][1] = y
+                point_clicked += 1
 
 def build_calibration():
     # open video stream
