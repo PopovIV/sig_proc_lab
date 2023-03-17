@@ -24,6 +24,56 @@ def widget_callback(x_entry, y_entry, z_entry, win):
         camera_coordinates[2] = float(z_entry.get())
         win.destroy()
 
+def matr_calc(LU, RU, RD, LD):
+    A03 = 0
+    A13 = 0
+    A22 = 1
+    A23 = 0
+    A30 = 0
+    A31 = 0
+    A32 = 0
+    A33 = 1
+
+    X0 = LU[0]
+    X1 = RU[0]
+    X2 = RD[0]
+    X3 = LD[0]
+    Y0 = LU[1]
+    Y1 = RU[1]
+    Y2 = RD[1]
+    Y3 = LD[1]
+    DX1 = X1 - X2
+    DX2 = X3 - X2
+    DX3 = X0 - X1 + X2 - X3
+    DY1 = Y1 - Y2
+    DY2 = Y3 - Y2
+    DY3 = Y0 - Y1 + Y2 - Y3
+    # Check if affin transformation 
+    if (DX3 == 0 and DY3 == 0):
+        A00 = X1 - X0
+        A10 = X2 - X1
+        A20 = X0
+        A01 = Y1 - Y0
+        A11 = Y2 - Y1
+        A21 = Y0
+        A02 = 0
+        A12 = 0
+    else:  # Projective transformation 
+        A02 = float(DX3 * DY2 - DY3 * DX2) / (DX1 * DY2 - DY1 * DX2)
+        A12 = float(DX1 * DY3 - DY1 * DX3) / (DX1 * DY2 - DY1 * DX2)
+        A20 = X0
+        A00 = X1 - X0 + A02 * X1
+        A10 = X3 - X0 + A12 * X3
+        A21 = Y0
+        A01 = Y1 - Y0 + A02 * Y1
+        A11 = Y3 - Y0 + A12 * Y3
+
+    M1 = np.matrix([[A00, A01, A02, A03],
+                    [A10, A11, A12, A13],
+                    [A20, A21, A22, A23],
+                    [A30, A31, A32, A33]])
+
+    return np.linalg.inv(M1).tolist()
 
 def calibration_mouse_callback(event, x, y, flags, params):
     global point_clicked
@@ -43,23 +93,21 @@ def calibration_mouse_callback(event, x, y, flags, params):
             # Get transformation matrix here
             width = 640
             height = 480
-            A = np.matrix([[result_square[0][0] / width, result_square[0][1] / height, 0, 0],\
-                          [0, 0, result_square[0][0] / width, result_square[0][1] / height],\
-                          [result_square[1][0] / width, result_square[1][1] / height, 0, 0],\
-                          [0, 0, result_square[1][0] / width, result_square[1][1] / height],\
-                          [result_square[2][0] / width, result_square[2][1] / height, 0, 0],\
-                          [0, 0, result_square[2][0] / width, result_square[2][1] / height],\
-                          [result_square[3][0] / width, result_square[3][1] / height, 0, 0],\
-                          [0, 0, result_square[3][0] / width, result_square[3][1] / height]])
-            b = np.array([0, 0, 0, 1, 1, 1, 1, 0])
-            transform_matrix  = np.linalg.lstsq(A, b, rcond=None)[0]
+            transform_matrix = matr_calc([result_square[0][0] / width, result_square[0][1] / height],\
+                          [result_square[1][0] / width, result_square[1][1] / height],\
+                          [result_square[2][0] / width, result_square[2][1] / height],\
+                          [result_square[3][0] / width, result_square[3][1] / height])
+            print(transform_matrix[0])
+            print(transform_matrix[1])
+            print(transform_matrix[2])
+            print(transform_matrix[3])
             is_calibr = True
 
             with open("calib.json", "w") as file:
                 data = {}
                 data["camera_coords"] = camera_coordinates
                 data["square_points"] = result_square
-                #data["transform_matrix "] = transform_matrix 
+                data["transform_matrix "] = transform_matrix 
                 file.write(json.dumps(data))
         elif y > camera_button[0] and y < camera_button[1] and x > camera_button[2] and x < camera_button[3]:
             win = tk.Tk()
@@ -81,12 +129,16 @@ def calibration_mouse_callback(event, x, y, flags, params):
             
 
         else:
-            print("OLD")
-            print(str(x / 640) + " " + str(y / 480))
-            print("NEW")
-            x1 = (x / 640) * transform_matrix[0] + (y / 480) * transform_matrix[1]
-            y1 = (x / 640) * transform_matrix[2] + (y / 480) * transform_matrix[3]
-            print(str(x1) + " " + str(y1))
+            if is_calibr is True:
+                print("OLD")
+                print(str(x / 640) + " " + str(y / 480))
+                print("NEW")
+                x1 = (x / 640) * transform_matrix[0][0] + (y / 480) * transform_matrix[1][0] + transform_matrix[2][0]
+                y1 = (x / 640) * transform_matrix[0][1] + (y / 480) * transform_matrix[1][1] + transform_matrix[2][1]
+                w = (x / 640) * transform_matrix[0][2] + (y / 480) * transform_matrix[1][2] + transform_matrix[2][2]
+                x1 = x1 / w
+                y1 = y1 / w
+                print(str(x1) + " " + str(y1))
             if is_calibr is False:
                 calibr_square[point_clicked % 4][0] = x
                 calibr_square[point_clicked % 4][1] = y
