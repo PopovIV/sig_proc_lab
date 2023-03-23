@@ -97,10 +97,6 @@ def calibration_mouse_callback(event, x, y, flags, params):
                           [result_square[1][0] / width, result_square[1][1] / height],\
                           [result_square[2][0] / width, result_square[2][1] / height],\
                           [result_square[3][0] / width, result_square[3][1] / height])
-            print(transform_matrix[0])
-            print(transform_matrix[1])
-            print(transform_matrix[2])
-            print(transform_matrix[3])
             is_calibr = True
 
             with open("calib.json", "w") as file:
@@ -111,7 +107,7 @@ def calibration_mouse_callback(event, x, y, flags, params):
                 file.write(json.dumps(data))
         elif y > camera_button[0] and y < camera_button[1] and x > camera_button[2] and x < camera_button[3]:
             win = tk.Tk()
-            win.title("Camera calibration")
+            win.title("Camera calibration") # For time being order LU -> RU -> RD -> LD
             tk.Label(win, text = "X-coordinate").grid(row = 0)
             tk.Label(win, text = "Y-coordinate").grid(row = 1)
             tk.Label(win, text = "Z-coordinate").grid(row = 2)
@@ -133,12 +129,8 @@ def calibration_mouse_callback(event, x, y, flags, params):
                 print("OLD")
                 print(str(x / 640) + " " + str(y / 480))
                 print("NEW")
-                x1 = (x / 640) * transform_matrix[0][0] + (y / 480) * transform_matrix[1][0] + transform_matrix[2][0]
-                y1 = (x / 640) * transform_matrix[0][1] + (y / 480) * transform_matrix[1][1] + transform_matrix[2][1]
-                w = (x / 640) * transform_matrix[0][2] + (y / 480) * transform_matrix[1][2] + transform_matrix[2][2]
-                x1 = x1 / w
-                y1 = y1 / w
-                print(str(x1) + " " + str(y1))
+                print(tranform_screen_point_to_floor(x / 640, y / 480))
+                print(camera_coordinates)
             if is_calibr is False:
                 calibr_square[point_clicked % 4][0] = x
                 calibr_square[point_clicked % 4][1] = y
@@ -167,3 +159,12 @@ def show_calibration():
     cv2.polylines(image, [pts], True, (0, 255, 0))
     if success:
         cv2.imshow(shared.CALIBRATION_WINDOW_NAME, image)
+
+def get_camera_coordinates():
+    return camera_coordinates
+
+def tranform_screen_point_to_floor(x, y):
+    x1 = x * transform_matrix[0][0] + y * transform_matrix[1][0] + transform_matrix[2][0]
+    y1 = x * transform_matrix[0][1] + y * transform_matrix[1][1] + transform_matrix[2][1]
+    w = x * transform_matrix[0][2] + y * transform_matrix[1][2] + transform_matrix[2][2]
+    return [x1 / w, y1 / w]
