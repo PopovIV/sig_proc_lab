@@ -7,6 +7,7 @@ from mediapipe.framework.formats import location_data_pb2
 import dlib
 from sklearn import neighbors as KNN
 from math import sqrt
+from calibration import load_matrix, tranform_screen_point_to_floor, get_camera_coordinates
 
 back_button = [0,40,0,100]
 video_stream = None
@@ -48,6 +49,46 @@ class Recognizer:
         for record in self.database:
             self.names[record[1]] = record[2]
 
+    def getWsPosition(self, point_ss_pos, floor_ss_pos):
+        cam_pos = get_camera_coordinates()
+        cam_floor = [cam_pos[0], 0, cam_pos[1]]
+
+        # ss - screen space
+        # ws - world space
+        point_projected_pos = tranform_screen_point_to_floor(point_ss_pos[0], point_ss_pos[1])
+        point_projected_pos = [point_projected_pos[0], 0, point_projected_pos[1]]
+
+        floor_ws_pos = tranform_screen_point_to_floor(floor_ss_pos[0], floor_ss_pos[1])
+        floor_ws_pos = [floor_ws_pos[0], 0, floor_ws_pos[1]]
+
+        # we have similar triangles
+
+        #                         * cam_pos
+        #                       / |
+        #                      /  |
+        #              point  /   |
+        #                    *    |
+        #                   /|    |
+        #                  / |    |
+        # projected_point *__*____*  cam_floor
+        #                   floor_point
+
+        # to get head we need linear interpolate between projected_point and cam_pos
+        # with alpha = len(projected_point - floor_point) / len(projected_point - cam_floor)
+
+        numenator = sqrt(
+            (point_projected_pos[0] - floor_ws_pos[0]) ** 2 +
+            (point_projected_pos[2] - floor_ws_pos[2]) ** 2)
+        denumenator = sqrt(
+            (point_projected_pos[0] - cam_floor[0]) ** 2 +
+            (point_projected_pos[2] - cam_floor[2]) ** 2)
+        alpha = numenator / denumenator
+
+        point_ws = [
+            (1-alpha) * point_projected_pos[0] + alpha * cam_pos[0],
+            (1 - alpha) * point_projected_pos[1] + alpha * cam_pos[1],
+            (1 - alpha) * point_projected_pos[2] + alpha * cam_pos[2]]
+        return point_ws
     def process(self, image):
         # transform image to RGB
         rgb_image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
@@ -104,7 +145,6 @@ def visualisation_mouse_callback(event, x, y, flags, params):
     if event == cv2.EVENT_LBUTTONDOWN:
         if y > back_button[0] and y < back_button[1] and x > back_button[2] and x < back_button[3]:
             shared.APPLICATION_STATE = shared.MENU_STATE
-
 def build_visualisation():
     # open video stream
     global video_stream
@@ -120,6 +160,7 @@ def build_visualisation():
         recognizer.database = json.loads(f.read())
         recognizer.loadClassifier()
 
+    load_matrix()
 def show_visualisation():
     global recognizer
     success, image = video_stream.read()

@@ -168,3 +168,13 @@ def tranform_screen_point_to_floor(x, y):
     y1 = x * transform_matrix[0][1] + y * transform_matrix[1][1] + transform_matrix[2][1]
     w = x * transform_matrix[0][2] + y * transform_matrix[1][2] + transform_matrix[2][2]
     return [x1 / w, y1 / w]
+
+def load_matrix():
+    global camera_coordinates
+    global result_square
+    global transform_matrix
+    with open("calib.json", "r") as file:
+        data = json.loads(file.read())
+        camera_coordinates = data["camera_coords"]
+        result_square = data["square_points"]
+        transform_matrix = data["transform_matrix "]
