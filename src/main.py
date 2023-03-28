@@ -66,7 +66,7 @@ def run_main_loop():
             show_visualisation()
 
         # update
-        cv2.waitKey(10)
+        cv2.waitKey(1)
 
 if __name__ == "__main__":
     run_main_loop()

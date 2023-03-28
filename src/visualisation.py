@@ -11,6 +11,9 @@ from calibration import load_matrix, tranform_screen_point_to_floor, get_camera_
 
 back_button = [0,40,0,100]
 video_stream = None
+is_face_detection = True
+is_face_recognition = True
+is_pose_detection = False
 
 class Human:
     #screenspace data
@@ -49,6 +52,7 @@ class Recognizer:
         for record in self.database:
             self.names[record[1]] = record[2]
 
+    # both arguments coordinates are from 0 to 1
     def getWsPosition(self, point_ss_pos, floor_ss_pos):
         cam_pos = get_camera_coordinates()
         cam_floor = [cam_pos[0], 0, cam_pos[1]]
@@ -85,7 +89,7 @@ class Recognizer:
         alpha = numenator / denumenator
 
         point_ws = [
-            (1-alpha) * point_projected_pos[0] + alpha * cam_pos[0],
+            (1 - alpha) * point_projected_pos[0] + alpha * cam_pos[0],
             (1 - alpha) * point_projected_pos[1] + alpha * cam_pos[1],
             (1 - alpha) * point_projected_pos[2] + alpha * cam_pos[2]]
         return point_ws
@@ -93,11 +97,12 @@ class Recognizer:
         # transform image to RGB
         rgb_image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
         # run model-s
-        pose_results = self.mp_pose_model.process(rgb_image)
-        face_results = self.mp_face_detection_model.process(rgb_image)
-
+        if is_face_detection:
+            face_results = self.mp_face_detection_model.process(rgb_image)
+        if is_pose_detection:
+            pose_results = self.mp_pose_model.process(rgb_image)
         # deal with faces first
-        if face_results.detections != None:
+        if is_face_detection and face_results.detections != None:
             result = []
 
             for face_detection in face_results.detections:
@@ -123,11 +128,12 @@ class Recognizer:
                         h.ss_face_bound_box[1],
                         h.ss_face_bound_box[0] + h.ss_face_bound_box[2],
                         h.ss_face_bound_box[1] + h.ss_face_bound_box[3])
-                    shape = self.face_shape_predictor_model(rgb_image, rect)
-                    h.features = shared.to_list(self.face_recognition_model.compute_face_descriptor(rgb_image, shape, 0))
+                    if is_face_recognition:
+                        shape = self.face_shape_predictor_model(rgb_image, rect)
+                        h.features = shared.to_list(self.face_recognition_model.compute_face_descriptor(rgb_image, shape, 0))
 
                     # classify them
-                    if self.face_classifier != None:
+                    if is_face_recognition and self.face_classifier != None:
                         data = self.face_classifier.kneighbors([h.features], n_neighbors=1)
                         dist = data[0][0][0]
                         ind = self.face_classifier.predict([h.features])[0]
@@ -151,7 +157,7 @@ def build_visualisation():
     global recognizer
     cv2.namedWindow(shared.VISUALISE_WINDOW_NAME)
     cv2.setMouseCallback(shared.VISUALISE_WINDOW_NAME, visualisation_mouse_callback)
-    video_stream = cv2.VideoCapture(0)
+    video_stream = shared.VideoCapture(shared.camera_src)#rtsp://admin:88888888@192.168.0.43:10554/tcp/av0_0")
 
     recognizer = Recognizer()
 
@@ -161,24 +167,25 @@ def build_visualisation():
         recognizer.loadClassifier()
 
     load_matrix()
+
 def show_visualisation():
     global recognizer
-    success, image = video_stream.read()
+    image = video_stream.read()
 
-    if success:
-        #process our algorithm
-        visualised_humans_data = recognizer.process(image)
+    image = shared.undistort(image)
+    #process our algorithm
+    visualised_humans_data = recognizer.process(image)
 
-        # draw faces bound boxes
-        for human in visualised_humans_data:
-            box = human.ss_face_bound_box
-            cv2.rectangle(image, (box[0], box[1]), (box[0] + box[2], box[1] + box[3]), (0, 255, 0), 10)
-            text = "id " + str(human.id)
-            if human.id in recognizer.names:
-                text += "(" + recognizer.names[human.id] + ")"
-            cv2.putText(image, text, (box[0], box[1] - 10), cv2.FONT_HERSHEY_PLAIN, 1, (0, 255, 0), 2)
+    # draw faces bound boxes
+    for human in visualised_humans_data:
+        box = human.ss_face_bound_box
+        cv2.rectangle(image, (box[0], box[1]), (box[0] + box[2], box[1] + box[3]), (0, 255, 0), 10)
+        text = "id " + str(human.id)
+        if human.id in recognizer.names:
+            text += "(" + recognizer.names[human.id] + ")"
+        cv2.putText(image, text, (box[0], box[1] - 10), cv2.FONT_HERSHEY_PLAIN, 1, (0, 255, 0), 2)
+    image = cv2.resize(image, shared.window_DIM)
 
     image[back_button[0]:back_button[1], back_button[2]:back_button[3]] = 180
     cv2.putText(image, 'back', (10, 30), cv2.FONT_HERSHEY_PLAIN, 2, (0), 3)
-    if success:
-        cv2.imshow(shared.VISUALISE_WINDOW_NAME, image)
+    cv2.imshow(shared.VISUALISE_WINDOW_NAME, image)

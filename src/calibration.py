@@ -8,7 +8,7 @@ import json
 back_button = [0,40,0,100]
 save_button = [0,40,120,220]
 camera_button = [0,40,240,380]
-result_square = [[0,0], [0, 480], [640, 480], [640, 0]]
+result_square = [[0,0], [0, shared.window_DIM[1]], [shared.window_DIM[0], shared.window_DIM[1]], [shared.window_DIM[0], 0]]
 transform_matrix = [1, 0, 0, 1]
 calibr_square = None
 point_clicked = 0
@@ -91,8 +91,8 @@ def calibration_mouse_callback(event, x, y, flags, params):
             result_square = calibr_square
             point_clicked = 0
             # Get transformation matrix here
-            width = 640
-            height = 480
+            width = shared.window_DIM[0]
+            height = shared.window_DIM[1]
             transform_matrix = matr_calc([result_square[0][0] / width, result_square[0][1] / height],\
                           [result_square[1][0] / width, result_square[1][1] / height],\
                           [result_square[2][0] / width, result_square[2][1] / height],\
@@ -122,14 +122,12 @@ def calibration_mouse_callback(event, x, y, flags, params):
             z_entry.insert(0, str(camera_coordinates[2]))
             tk.Button(win, text = "Ok", command = lambda : widget_callback(x_entry, y_entry, z_entry, win)).grid(row = 4, column = 1, sticky= tk.W, pady = 4)
             win.mainloop()
-            
-
         else:
             if is_calibr is True:
                 print("OLD")
-                print(str(x / 640) + " " + str(y / 480))
+                print(str(x / shared.window_DIM[0]) + " " + str(y / shared.window_DIM[1]))
                 print("NEW")
-                print(tranform_screen_point_to_floor(x / 640, y / 480))
+                print(tranform_screen_point_to_floor(x / shared.window_DIM[0], y / shared.window_DIM[1]))
                 print(camera_coordinates)
             if is_calibr is False:
                 calibr_square[point_clicked % 4][0] = x
@@ -143,26 +141,29 @@ def build_calibration():
     calibr_square =  copy.deepcopy(result_square)
     cv2.namedWindow(shared.CALIBRATION_WINDOW_NAME)
     cv2.setMouseCallback(shared.CALIBRATION_WINDOW_NAME, calibration_mouse_callback)
-    video_stream = cv2.VideoCapture(0)
+    video_stream = cv2.VideoCapture(shared.camera_src)
 
 def show_calibration():
     global calibr_square
     success, image = video_stream.read()
-    image[back_button[0]:back_button[1], back_button[2]:back_button[3]] = 180
-    cv2.putText(image, 'back', (10, 30), cv2.FONT_HERSHEY_PLAIN, 2, (0), 3)
-    image[save_button[0]:save_button[1], save_button[2]:save_button[3]] = 180
-    cv2.putText(image, 'save', (130, 30), cv2.FONT_HERSHEY_PLAIN, 2, (0), 3)
-    image[camera_button[0]:camera_button[1], camera_button[2]:camera_button[3]] = 180
-    cv2.putText(image, 'camera', (250, 30), cv2.FONT_HERSHEY_PLAIN, 2, (0), 3)
-    pts = np.array([calibr_square[0], calibr_square[1], calibr_square[2], calibr_square[3]], np.int32)
-    pts = pts.reshape((-1, 1, 2))
-    cv2.polylines(image, [pts], True, (0, 255, 0))
     if success:
+        image = shared.undistort(image)
+        image = cv2.resize(image, shared.window_DIM)
+        image[back_button[0]:back_button[1], back_button[2]:back_button[3]] = 180
+        cv2.putText(image, 'back', (10, 30), cv2.FONT_HERSHEY_PLAIN, 2, (0), 3)
+        image[save_button[0]:save_button[1], save_button[2]:save_button[3]] = 180
+        cv2.putText(image, 'save', (130, 30), cv2.FONT_HERSHEY_PLAIN, 2, (0), 3)
+        image[camera_button[0]:camera_button[1], camera_button[2]:camera_button[3]] = 180
+        cv2.putText(image, 'camera', (250, 30), cv2.FONT_HERSHEY_PLAIN, 2, (0), 3)
+        pts = np.array([calibr_square[0], calibr_square[1], calibr_square[2], calibr_square[3]], np.int32)
+        pts = pts.reshape((-1, 1, 2))
+        cv2.polylines(image, [pts], True, (0, 255, 0))
         cv2.imshow(shared.CALIBRATION_WINDOW_NAME, image)
 
 def get_camera_coordinates():
     return camera_coordinates
 
+# x from 0 to 1, y from 0 to 1
 def tranform_screen_point_to_floor(x, y):
     x1 = x * transform_matrix[0][0] + y * transform_matrix[1][0] + transform_matrix[2][0]
     y1 = x * transform_matrix[0][1] + y * transform_matrix[1][1] + transform_matrix[2][1]
