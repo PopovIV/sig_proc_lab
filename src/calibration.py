@@ -125,6 +125,7 @@ def calibration_mouse_callback(event, x, y, flags, params):
         else:
             if is_calibr is True:
                 print("OLD")
+                print(str(x) + " " + str(y))
                 print(str(x / shared.window_DIM[0]) + " " + str(y / shared.window_DIM[1]))
                 print("NEW")
                 print(tranform_screen_point_to_floor(x / shared.window_DIM[0], y / shared.window_DIM[1]))
