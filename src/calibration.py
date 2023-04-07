@@ -24,6 +24,7 @@ def widget_callback(x_entry, y_entry, z_entry, win):
         camera_coordinates[2] = float(z_entry.get())
         win.destroy()
 
+# Based on https://web.archive.org/web/20100801071311/http://alumni.media.mit.edu/~cwren/interpolator/
 def matr_calc(LU, RU, RD, LD):
     A03 = 0
     A13 = 0
