@@ -5,6 +5,7 @@ import numpy as np
 import tkinter as tk
 import json
 
+EPS = 1e-3
 back_button = [0,40,0,100]
 save_button = [0,40,120,220]
 camera_button = [0,40,240,380]
@@ -50,7 +51,7 @@ def matr_calc(LU, RU, RD, LD):
     DY2 = Y3 - Y2
     DY3 = Y0 - Y1 + Y2 - Y3
     # Check if affin transformation 
-    if (DX3 == 0 and DY3 == 0):
+    if (DX3 < EPS and DY3 < EPS):
         A00 = X1 - X0
         A10 = X2 - X1
         A20 = X0
